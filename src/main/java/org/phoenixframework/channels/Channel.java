@@ -64,6 +64,10 @@ public class Channel {
         this.onClose(new IMessageCallback() {
             @Override
             public void onMessage(Envelope envelope) {
+                if (Channel.this.channelTimer != null) {
+                    Channel.this.channelTimer.cancel();
+                    Channel.this.channelTimer = null;
+                }
                 Channel.this.state = ChannelState.CLOSED;
                 Channel.this.socket.remove(Channel.this);
             }
@@ -81,8 +85,6 @@ public class Channel {
                 Channel.this.trigger(Socket.replyEventName(envelope.getRef()), envelope);
             }
         });
-
-
     }
 
     /**
@@ -143,6 +145,13 @@ public class Channel {
                 Channel.this.trigger(ChannelEvent.CLOSE.getPhxEvent(), null);
             }
         });
+    }
+
+    public void close() {
+        if (this.channelTimer != null) {
+            this.channelTimer.cancel();
+            this.channelTimer = null;
+        }
     }
 
     /**

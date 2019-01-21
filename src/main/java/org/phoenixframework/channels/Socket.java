@@ -187,6 +187,19 @@ public class Socket {
         return channel;
     }
 
+    public void connect(final String authorization) throws IOException {
+        log.trace("connect");
+        disconnect();
+        // No support for ws:// or ws:// in okhttp. See https://github.com/square/okhttp/issues/1652
+        final String httpUrl = this.endpointUri.replaceFirst("^ws:", "http:")
+            .replaceFirst("^wss:", "https:");
+        final Request request = new Request.Builder()
+            .addHeader("Authorization", authorization)
+            .url(httpUrl)
+            .build();
+        webSocket = httpClient.newWebSocket(request, wsListener);
+    }
+
     public void connect() throws IOException {
         log.trace("connect");
         disconnect();
@@ -200,10 +213,21 @@ public class Socket {
     public void disconnect() throws IOException {
         log.trace("disconnect");
         if (webSocket != null) {
-            webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
+            webSocket.close(1000 /*CLOSE_NORMAL*/, "Close normal by client");
         }
         cancelHeartbeatTimer();
         cancelReconnectTimer();
+    }
+
+    public void close() {
+        if (this.timer != null) {
+            this.timer.cancel();
+            this.timer = null;
+        }
+
+        if(httpClient != null) {
+            httpClient.dispatcher().executorService().shutdown();
+        }
     }
 
     /**
@@ -276,7 +300,7 @@ public class Socket {
 
         log.trace("push: {}, isConnected:{}, JSON:{}", envelope, isConnected(), json);
 
-        RequestBody body = RequestBody.create(MediaType.parse("text/xml"), json);
+        RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
 
         if (this.isConnected()) {
             webSocket.send(json);
